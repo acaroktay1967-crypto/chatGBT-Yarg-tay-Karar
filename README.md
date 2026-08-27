@@ -1,0 +1,1 @@
+# chatGBT-Yarg-tay-Karar
