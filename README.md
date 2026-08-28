@@ -5,17 +5,13 @@ iPhone ve masaüstü için Yargıtay karar arama motoru.
 ## Özellikler
 
 - 50.000 karar üzerinde yerel arama
-- Ters indeks tabanlı hızlı arama
+- Ters indeks tabanlı hızlı arama (64 shard)
 - Türkçe tam metin arama (İ/i, Ş/ş, Ğ/ğ, Ü/ü, Ö/ö, Ç/ç desteği)
 - Daire filtresi
 - Yıl filtresi
 - İlgililik sıralaması
 - En yeni karar sıralaması
 - Tam Kararı Aç
-- Korpustan Çek ve Kaydet
-- iPhone IndexedDB yerel karar arşivi
-- Kaydedilenler ekranı
-- JSON olarak dışa aktarma
 - a-Shell mini desteği
 - GitHub gerektirmeden iPhone üzerinde yerel çalışma
 
@@ -26,13 +22,9 @@ Hugging Face Yargıtay korpusu
         ↓
 Python veri hazırlama (tools/)
         ↓
-SQLite / FTS5
-        ↓
-JSON ters indeks
+JSON ters indeks (64 shard)
         ↓
 Safari JavaScript arama motoru (app.js)
-        ↓
-IndexedDB kişisel karar arşivi
 ```
 
 ## Dosya Yapısı
@@ -40,9 +32,9 @@ IndexedDB kişisel karar arşivi
 ```
 /
 ├── index.html          # Ana HTML arayüzü
-├── app.js              # Arama motoru ve UI JavaScript
+├── app.js              # Arama motoru JavaScript
 ├── server.py           # a-Shell mini uyumlu HTTP sunucu
-├── manifest.json       # PWA manifest
+├── manifest.json       # Uygulama manifest
 ├── README.md           # Bu dosya
 ├── CHANGELOG.md        # Sürüm geçmişi
 ├── VERSION             # Sürüm numarası
@@ -56,34 +48,39 @@ IndexedDB kişisel karar arşivi
 │   ├── TEKNIK_NOTLAR.md    # Teknik dokümantasyon
 │   └── IPHONE_KURULUM.md   # iPhone kurulum kılavuzu
 │
-├── index/              # [GIT HARİCİ] Ters indeks dosyaları
-│   ├── inverted_index.json
-│   └── doc_meta.json
+├── meta.json           # [GIT HARİCİ] Karar meta verileri (6.4 MB)
+├── index/              # [GIT HARİCİ] Ters indeks dosyaları (64 shard)
+│   └── i-00.json ... i-63.json
 │
-└── docs-data/          # [GIT HARİCİ] Karar metin dosyaları
-    └── *.txt
+└── docs/               # [GIT HARİCİ] Karar metin dosyaları (500 chunk)
+    └── d-000.json ... d-499.json
 ```
 
-## iPhone Çalıştırma
+## iPhone Çalıştırma (a-Shell mini)
 
-1. Proje/veri paketi iPhone'a alınır.
-2. a-Shell mini'de proje klasörü seçilir.
-3. Şu komut çalıştırılır:
+1. ZIP paketini iPhone'a aktarın (iCloud, AirDrop, vb.)
+2. Dosyalar uygulamasında ZIP'i açın
+3. a-Shell mini'yi açın ve şunu çalıştırın:
+   ```bash
+   pickFolder
+   ```
+4. Açılan listeden HukukIctihat klasörünü seçin
+5. Sunucuyu başlatın:
+   ```bash
+   python3 server.py
+   ```
+   veya:
+   ```bash
+   python3 -m http.server 8000
+   ```
+6. Safari'de açın:
+   ```
+   http://127.0.0.1:8000
+   ```
 
-```bash
-python3 server.py
-```
+**Beklenen:** "50.000 karar hazır." mesajı
 
-4. Safari'de açın:
-
-```
-http://127.0.0.1:8000
-```
-
-**ÖNEMLİ:** Standart `python3 -m http.server` kullanmayın. 
-`server.py` dosyası a-Shell mini'nin iOS sandbox ortamında oluşan özel hataları
-(NoneType client_address, BrokenPipeError, ConnectionResetError) tolere edecek 
-şekilde tasarlanmıştır.
+**Not:** ConnectionResetError veya BrokenPipeError mesajları Safari bir isteği yarıda kestiğinde görülebilir. Sayfa ve arama çalışıyorsa bunlar kritik değildir.
 
 ## Masaüstü Kurulum
 
@@ -93,12 +90,7 @@ http://127.0.0.1:8000
    cd chatGBT-Yarg-tay-Karar
    ```
 
-2. Veri hazırlayın (ilk seferde):
-   ```bash
-   cd tools
-   python3 hf_yargitay_to_iphone.py
-   python3 build_index.py
-   ```
+2. Veri paketini indirin ve açın (meta.json, index/, docs/ dosyaları)
 
 3. Sunucuyu başlatın:
    ```bash
@@ -114,77 +106,73 @@ http://127.0.0.1:8000
 
 ### Arama
 
-1. Arama kutusuna anahtar kelimeler girin (örn: "hırsızlık", "kasten yaralama")
-2. İsteğe bağlı filtreleri ayarlayın:
-   - **Daire:** Belirli bir Yargıtay dairesi
-   - **Yıl:** Başlangıç ve bitiş yılı
-   - **Sıralama:** İlgililik veya tarih
-3. "Ara" butonuna tıklayın
+1. Arama kutusuna anahtar kelimeler girin:
+   - Örnek: "olası kast"
+   - Örnek: "uyuşturucu"
+   - Örnek: "HTS"
+   - Örnek: "2019/3931"
+2. Filtreleri ayarlayın:
+   - **Daire:** "1. Ceza" gibi
+   - **Karar Yılı:** 2020, 2021, vb.
+   - **Sıralama:** İlgililik veya En yeni tarih
+3. "ARA" butonuna tıklayın
 
-### Karar Kaydetme
+### Tam Kararı Görüntüleme
 
-1. Arama sonuçlarında "Kaydet" butonuna tıklayın
-2. Karar IndexedDB'ye (yerel depolama) kaydedilir
-3. İnternet bağlantısı olmadan erişilebilir
-
-### Kaydedilenleri Görüntüleme
-
-1. "Kaydedilenler" butonuna tıklayın
-2. Kayıtlı kararları listeleyin
-3. "Görüntüle" veya "Sil" işlemlerini yapın
-
-### JSON Dışa Aktarma
-
-1. "JSON Dışa Aktar" butonuna tıklayın
-2. Tüm kayıtlı kararlar JSON formatında indirilir
-3. Yedekleme veya başka uygulamalarda kullanım için
+1. Arama sonuçlarında "Tam Kararı Aç" butonuna tıklayın
+2. Karar metninin tamamı gösterilir
 
 ## Teknik Detaylar
 
 ### Ters İndeks Yapısı
 
+64 shard'a bölünmüş delta-encoded posting listeleri:
+
 ```json
+// index/i-XX.json
 {
-    "kelime": [[docId, termFrequency], ...],
+    "kelime": [delta1, delta2, delta3, ...],
     ...
 }
 ```
 
-### Doküman Meta Yapısı
+### Meta Veri Yapısı
 
 ```json
-{
-    "docId": {
-        "daire": "1. Ceza Dairesi",
-        "esas": "2023/1234",
-        "karar": "2023/5678",
-        "tarih": "15.03.2023",
-        "ozet": "...",
-        "dosyaAdi": "1234.txt"
-    }
-}
+// meta.json
+[
+    {
+        "row_id": 1,
+        "court": "1. Ceza Dairesi",
+        "esas_no": "2020/1234",
+        "karar_no": "2020/5678",
+        "karar_tarihi": "2020-03-15",
+        "year": 2020
+    },
+    ...
+]
 ```
 
-### IndexedDB Yapısı
+### Karar Metinleri
 
-- **Veritabanı:** HukukIctihatArsiv
-- **Object Store:** kararlar
-- **Indeksler:** daire, tarih, savedAt
+100'er kayıt içeren chunk dosyaları:
+
+```json
+// docs/d-XXX.json
+[
+    {"id": 1, "text": "Tam karar metni..."},
+    ...
+]
+```
 
 ## Sürüm Bilgisi
 
 - **Versiyon:** 4.2.0
-- **Karar Sayısı:** ~50.000
-- **Kapsam:** Yargıtay Ceza Daireleri (2020-2026)
+- **Karar Sayısı:** 50.000
+- **İndeks Shard:** 64
+- **Doküman Chunk:** 500
+- **Kapsam:** Yargıtay Ceza Daireleri (2020)
 - **Kaynak:** Hugging Face Yargıtay Korpusu
-
-## Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/yenilik`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Yeni özellik eklendi'`)
-4. Branch'i push edin (`git push origin feature/yenilik`)
-5. Pull Request açın
 
 ## Lisans
 

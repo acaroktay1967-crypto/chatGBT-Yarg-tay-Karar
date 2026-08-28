@@ -22,17 +22,19 @@ docs-data/
 generated-data/
 iphone_ceza_2020_2026/
 
-# İndeks ve karar dosyaları (üretilen veriler)
-# Not: /docs klasörü dokümantasyon içindir ve repoda tutulur
-# Karar metin dosyaları docs-data/ veya data/ altında olmalı
+# V4 FINAL büyük veri dosyaları
+meta.json
 index/
-data/
-karar-metinleri/
+docs/*.json
 
 # Geçici dosyalar
 *.tmp
 *.temp
 *.log
+temp_extract/
+
+# Yedek dosyalar
+*.bak
 
 # IDE
 .vscode/

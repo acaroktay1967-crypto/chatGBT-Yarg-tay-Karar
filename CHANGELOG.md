@@ -2,28 +2,25 @@
 
 Tüm önemli değişiklikler bu dosyada belgelenmektedir.
 
-## [4.2.0] - 2024
+## [4.2.0] - 2026-08-28
 
 ### Eklenen
-- iPhone a-Shell mini yerel sunucu düzeltildi (SafeTCPServer/QuietHandler)
-- 50.000 karar ters indeks araması eklendi
-- Korpustan Çek ve Kaydet özelliği eklendi
-- IndexedDB yerel karar arşivi eklendi
-- Kaydedilenler ekranı eklendi
-- JSON dışa aktarma özelliği eklendi
+- V4 FINAL kompakt app.js (5KB)
+- 64 shard'lı ters indeks yapısı
+- Delta-encoded posting listeleri
+- 500 chunk'lık karar metin yapısı
+- Daire ve yıl filtreleri
+- İlgililik ve tarih sıralaması
+
+### Değiştirilen
+- app.js tamamen yeniden yazıldı (kompakt versiyon)
+- index.html basitleştirildi
+- manifest.json güncellendi
 
 ### Korunan
-- Daire filtreleme
-- Yıl filtreleme
-- İlgililik sıralaması
-- Tarih sıralaması
-- Türkçe tam metin arama
-- Tam Kararı Aç özelliği
-
-### Düzeltilen
-- a-Shell mini NoneType client_address hatası
-- BrokenPipeError toleransı
-- ConnectionResetError toleransı
+- a-Shell mini uyumlu server.py (SafeTCPServer/QuietHandler)
+- Türkçe karakter desteği
+- 50.000 karar üzerinde arama
 
 ## [4.1.0] - 2024
 

@@ -1,6 +1,6 @@
 # Teknik Notlar
 
-Bu doküman Hukukİçtihat+ Ceza V4.2 uygulamasının teknik detaylarını açıklar.
+Bu doküman Hukukİçtihat+ Ceza V4 uygulamasının teknik detaylarını açıklar.
 
 ## Mimari Genel Bakış
 
@@ -20,110 +20,143 @@ Bu doküman Hukukİçtihat+ Ceza V4.2 uygulamasının teknik detaylarını açı
 ┌─────────────────────────────────────────────────────────┐
 │                    app.js                                │
 │    ┌─────────────┬──────────────┬─────────────────┐     │
-│    │  Arama      │   IndexedDB  │   UI            │     │
-│    │  Motoru     │   İşlemleri  │   Fonksiyonları │     │
+│    │  Arama      │   Shard      │   UI            │     │
+│    │  Motoru     │   Yönetimi   │   Fonksiyonları │     │
 │    └─────────────┴──────────────┴─────────────────┘     │
 └─────────────────────┬───────────────────────────────────┘
                       │
-          ┌───────────┴───────────┐
-          ▼                       ▼
-┌─────────────────────┐   ┌─────────────────────┐
-│   index/            │   │   docs/             │
-│   ├─ inverted_      │   │   ├─ 1.txt          │
-│   │  index.json     │   │   ├─ 2.txt          │
-│   └─ doc_meta.json  │   │   └─ ...            │
-└─────────────────────┘   └─────────────────────┘
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ meta.json   │ │ index/      │ │ docs/       │
+│ (6.4 MB)    │ │ i-00..i-63  │ │ d-000..499  │
+│ 50K kayıt   │ │ 64 shard    │ │ 500 chunk   │
+└─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ## Ters İndeks Yapısı
 
-### Temel Konsept
+### Shard Sistemi
 
-Ters indeks, her kelime için o kelimenin geçtiği dokümanların listesini tutar.
-Bu yapı, tam metin aramasını son derece hızlı hale getirir.
+64 shard'a bölünmüş indeks yapısı. Her kelime hash fonksiyonuyla bir shard'a atanır:
 
-### JSON Formatı
-
-```json
-{
-    "hırsızlık": [[1, 5], [23, 3], [156, 8]],
-    "kasten": [[2, 2], [45, 1], [890, 4]],
-    "yaralama": [[2, 1], [45, 1], [890, 3]]
+```javascript
+function shard(tok) {
+    let h = 5381;
+    for (const ch of tok) {
+        h = (((h << 5) + h) + ch.codePointAt(0)) >>> 0;
+    }
+    return h % 64;
 }
 ```
 
-Her eleman: `[doküman_id, terim_frekansı]`
+### Delta Encoding
+
+Posting listeleri delta-encoded olarak saklanır (yer tasarrufu):
+
+```json
+// Orijinal: [5, 12, 15, 28]
+// Delta:    [5, 7, 3, 13]
+{
+    "hırsızlık": [5, 7, 3, 13],
+    "kasten": [2, 10, 5, 8]
+}
+```
+
+Decode fonksiyonu:
+
+```javascript
+function decode(a) {
+    let x = 0;
+    return a.map(d => (x += d));
+}
+```
 
 ### Arama Algoritması
 
-1. **Tokenizasyon**: Sorgu kelimelere ayrılır
-2. **Posting Listesi**: Her kelime için posting listesi alınır
-3. **Kesişim (AND)**: Tüm kelimelerin geçtiği dokümanlar bulunur
-4. **Skorlama**: Terim frekanslarına göre sıralama yapılır
-
-```javascript
-function search(query) {
-    const tokens = tokenize(query);
-    const postingLists = tokens.map(t => postings(index, t));
-    const matchedDocs = intersectMultiple(postingLists);
-    return matchedDocs.sort((a, b) => b.score - a.score);
-}
-```
+1. **Tokenizasyon**: Sorgu kelimelere ayrılır (min 3 karakter)
+2. **Shard Belirleme**: Her kelime için shard hesaplanır
+3. **Posting Listesi**: İlgili shard'dan posting listesi alınır
+4. **Delta Decode**: Posting listesi decode edilir
+5. **Kesişim (AND)**: Tüm kelimelerin geçtiği dokümanlar bulunur
+6. **Skorlama**: Metin içinde kelime frekansına göre sıralama
 
 ## Türkçe Karakter Desteği
 
-### Sorun
-
-JavaScript'in `toLowerCase()` fonksiyonu Türkçe karakterleri doğru işlemez:
-- `"İSTANBUL".toLowerCase()` = "i̇stanbul" (yanlış)
-- `"IŞIK".toLowerCase()` = "ışık" (yanlış - büyük I küçük i olmalı)
-
-### Çözüm
-
-Özel Türkçe lowercase fonksiyonu:
+### Lowercase Fonksiyonu
 
 ```javascript
-const TR_LOWER_MAP = {
-    'İ': 'i', 'I': 'ı', 'Ş': 'ş', 
-    'Ğ': 'ğ', 'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
-};
+const low = s => String(s || "")
+    .replaceAll("İ", "i")
+    .replaceAll("I", "ı")
+    .toLocaleLowerCase("tr-TR");
+```
 
-function turkishLowerCase(str) {
-    let result = '';
-    for (let ch of str) {
-        result += TR_LOWER_MAP[ch] || ch.toLowerCase();
-    }
-    return result;
+### Tokenizasyon
+
+```javascript
+function toks(s) {
+    const a = low(s).match(/[0-9a-zçğıöşü]+/g) || [];
+    return [...new Set(a.filter(x => x.length >= 3))];
 }
 ```
 
-## IndexedDB Yapısı
+## Veri Yapıları
 
-### Veritabanı Şeması
-
-```
-Veritabanı: HukukIctihatArsiv
-└── Object Store: kararlar
-    ├── keyPath: id
-    └── Indeksler:
-        ├── daire (unique: false)
-        ├── tarih (unique: false)
-        └── savedAt (unique: false)
-```
-
-### Kayıt Formatı
+### manifest.json
 
 ```json
 {
-    "id": 12345,
-    "daire": "1. Ceza Dairesi",
-    "esas": "2023/1234",
-    "karar": "2023/5678",
-    "tarih": "15.03.2023",
-    "ozet": "...",
-    "content": "Tam karar metni...",
-    "savedAt": "2024-01-15T10:30:00.000Z"
+    "count": 50000,
+    "index_shards": 64,
+    "doc_chunk": 100,
+    "doc_chunks": 500,
+    "year_min": 2020,
+    "year_max": 2020,
+    "version": "4.1-final"
 }
+```
+
+### meta.json
+
+50.000 karar için meta veri dizisi:
+
+```json
+[
+    {
+        "row_id": 1,
+        "court": "1. Ceza Dairesi",
+        "esas_no": "2020/1234",
+        "karar_no": "2020/5678",
+        "karar_tarihi": "2020-03-15",
+        "year": 2020
+    },
+    ...
+]
+```
+
+### index/i-XX.json (64 dosya)
+
+Her shard'da kelime -> delta-encoded posting listesi:
+
+```json
+{
+    "hırsızlık": [5, 7, 3, 13, ...],
+    "kasten": [2, 10, 5, 8, ...],
+    ...
+}
+```
+
+### docs/d-XXX.json (500 dosya)
+
+Her chunk'ta 100 karar metni:
+
+```json
+[
+    {"id": 1, "text": "T.C. YARGITAY 1. Ceza Dairesi..."},
+    {"id": 2, "text": "T.C. YARGITAY 2. Ceza Dairesi..."},
+    ...
+]
 ```
 
 ## a-Shell mini Uyumluluğu
@@ -136,7 +169,7 @@ a-Shell mini iOS sandbox ortamında çalışırken bazı Python HTTP server soru
 2. **BrokenPipeError**: Bağlantı koptuğunda hata fırlatılır
 3. **ConnectionResetError**: İstemci bağlantıyı aniden kapatır
 
-### Çözüm: SafeTCPServer
+### Çözüm: server.py
 
 ```python
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -156,53 +189,50 @@ class SafeTCPServer(socketserver.TCPServer):
 
 ## Performans Optimizasyonları
 
-### İndeks Yükleme
+### Lazy Loading
 
-- İndeks dosyaları sadece ilk aramada yüklenir
-- Yüklenen indeks bellekte tutulur (memoization)
+- Shard'lar sadece ihtiyaç duyulduğunda yüklenir
+- Doküman chunk'ları sadece görüntülendiğinde yüklenir
+- Yüklenen veriler bellekte önbelleğe alınır
 
 ```javascript
-let idx = null;
-async function getIdx() {
-    if (idx !== null) return idx;
-    idx = await fetch('index/inverted_index.json').then(r => r.json());
-    return idx;
+const IDX = new Map();  // Shard önbelleği
+const DOC = new Map();  // Doküman önbelleği
+
+async function getIdx(s) {
+    if (IDX.has(s)) return IDX.get(s);
+    const r = await fetch(`index/i-${String(s).padStart(2, "0")}.json`);
+    const d = await r.json();
+    IDX.set(s, d);
+    return d;
 }
 ```
 
 ### Kesişim Optimizasyonu
 
-- En kısa posting listesiyle başlanır
-- Erken çıkış: Kesişim boşsa döngü kesilir
+En kısa posting listesiyle başlanır:
 
 ```javascript
-function intersectMultiple(lists) {
-    lists.sort((a, b) => a.length - b.length);  // En kısa önce
-    let result = lists[0];
-    for (let list of lists.slice(1)) {
-        result = intersect(result, list);
-        if (result.length === 0) break;  // Erken çıkış
-    }
-    return result;
+lists.sort((a, b) => a.length - b.length);
+ids = lists[0];
+for (let i = 1; i < lists.length; i++) {
+    ids = intersect(ids, lists[i]);
+    if (!ids.length) break;  // Erken çıkış
 }
 ```
 
-## Veri Boyutu Tahminleri
+## Veri Boyutları
 
-50.000 karar için yaklaşık boyutlar:
-
-| Dosya | Boyut |
-|-------|-------|
-| inverted_index.json | 15-30 MB |
-| doc_meta.json | 5-10 MB |
-| docs/*.txt (toplam) | 500-1000 MB |
-
-**Not:** Büyük veri dosyaları GitHub'a yüklenmez.
-Kullanıcı kendi verilerini oluşturmalıdır.
+| Dosya/Klasör | Boyut |
+|--------------|-------|
+| meta.json | ~6.4 MB |
+| index/ (64 shard) | ~15 MB |
+| docs/ (500 chunk) | ~85 MB |
+| **Toplam** | ~106 MB |
 
 ## Güvenlik Notları
 
-1. **CORS**: Sunucu tüm originlere izin verir (yerel kullanım için)
+1. **CORS**: Yerel sunucu tüm originlere izin verir
 2. **XSS**: Kullanıcı girdileri escape edilir
 3. **Veri Gizliliği**: Tüm veriler yerel kalır, sunucuya gönderilmez
 
@@ -210,20 +240,13 @@ Kullanıcı kendi verilerini oluşturmalıdır.
 
 ### Console Logları
 
-```javascript
-console.log('İndeks yüklendi:', Object.keys(idx).length, 'kelime');
-console.log('Arama sonucu:', results.length, 'doküman');
-```
+Tarayıcı konsolunda:
+- Shard yükleme hataları
+- Doküman yükleme hataları
+- Arama sonuç sayısı
 
-### IndexedDB İnceleme
+### a-Shell Logları
 
-Safari: Geliştirici > Storage > IndexedDB
-Chrome: DevTools > Application > IndexedDB
-
-## Gelecek Geliştirmeler
-
-- [ ] Web Worker ile arka plan arama
-- [ ] Phrase arama (tırnak içi)
-- [ ] Fuzzy matching (yaklaşık eşleşme)
-- [ ] Otomatik tamamlama
-- [ ] Offline PWA desteği
+Terminal çıktısında:
+- HTTP istekleri
+- Bağlantı hataları (genellikle zararsız)
