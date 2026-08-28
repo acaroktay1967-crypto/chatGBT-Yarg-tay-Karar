@@ -1,4 +1,4 @@
- # Hukukİçtihat+ Ceza
+# Hukukİçtihat+ Ceza
 
 iPhone ve masaüstü için Yargıtay karar arama motoru.
 
@@ -60,19 +60,32 @@ IndexedDB kişisel karar arşivi
 │   ├── inverted_index.json
 │   └── doc_meta.json
 │
-└── docs/               # [GIT HARİCİ] Karar metin dosyaları
+└── docs-data/          # [GIT HARİCİ] Karar metin dosyaları
     └── *.txt
 ```
 
-## Kurulum
+## iPhone Çalıştırma
 
-### Gereksinimler
+1. Proje/veri paketi iPhone'a alınır.
+2. a-Shell mini'de proje klasörü seçilir.
+3. Şu komut çalıştırılır:
 
-- Python 3.8+
-- iOS: a-Shell mini (App Store'dan)
-- Masaüstü: Herhangi bir modern tarayıcı
+```bash
+python3 server.py
+```
 
-### Masaüstü Kurulum
+4. Safari'de açın:
+
+```
+http://127.0.0.1:8000
+```
+
+**ÖNEMLİ:** Standart `python3 -m http.server` kullanmayın. 
+`server.py` dosyası a-Shell mini'nin iOS sandbox ortamında oluşan özel hataları
+(NoneType client_address, BrokenPipeError, ConnectionResetError) tolere edecek 
+şekilde tasarlanmıştır.
+
+## Masaüstü Kurulum
 
 1. Repoyu klonlayın:
    ```bash
@@ -96,32 +109,6 @@ IndexedDB kişisel karar arşivi
    ```
    http://127.0.0.1:8000
    ```
-
-### iPhone Kurulum (a-Shell mini)
-
-1. Proje klasörünü iPhone'a aktarın (iCloud, AirDrop, vb.)
-
-2. a-Shell mini uygulamasını açın
-
-3. Proje klasörüne gidin:
-   ```bash
-   cd /path/to/chatGBT-Yarg-tay-Karar
-   ```
-
-4. Sunucuyu başlatın:
-   ```bash
-   python3 server.py
-   ```
-
-5. Safari'de açın:
-   ```
-   http://127.0.0.1:8000
-   ```
-
-**ÖNEMLİ:** Standart `python3 -m http.server` kullanmayın. 
-`server.py` dosyası a-Shell mini'nin iOS sandbox ortamında oluşan özel hataları
-(NoneType client_address, BrokenPipeError, ConnectionResetError) tolere edecek 
-şekilde tasarlanmıştır.
 
 ## Kullanım
 
