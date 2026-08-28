@@ -17,21 +17,10 @@ __pycache__/
 .AppleDouble
 .LSOverride
 
-# Büyük veri dosyaları - GitHub'a yüklenmemeli
-docs-data/
-generated-data/
-iphone_ceza_2020_2026/
-
-# V4 FINAL büyük veri dosyaları
-meta.json
-index/
-docs/*.json
-
 # Geçici dosyalar
 *.tmp
 *.temp
 *.log
-temp_extract/
 
 # Yedek dosyalar
 *.bak
@@ -42,7 +31,7 @@ temp_extract/
 *.swp
 *.swo
 
-# Node.js (eğer kullanılıyorsa)
+# Node.js
 node_modules/
 
 # Virtual environment
