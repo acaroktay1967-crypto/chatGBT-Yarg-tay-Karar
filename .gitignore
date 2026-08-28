@@ -1,0 +1,49 @@
+# Veritabanı dosyaları
+*.db
+*.sqlite
+*.sqlite3
+
+# Sıkıştırılmış dosyalar
+*.zip
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Büyük veri dosyaları - GitHub'a yüklenmemeli
+docs-data/
+generated-data/
+iphone_ceza_2020_2026/
+
+# İndeks ve karar dosyaları (üretilen veriler)
+# Not: /docs klasörü dokümantasyon içindir ve repoda tutulur
+# Karar metin dosyaları docs-data/ veya data/ altında olmalı
+index/
+data/
+karar-metinleri/
+
+# Geçici dosyalar
+*.tmp
+*.temp
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node.js (eğer kullanılıyorsa)
+node_modules/
+
+# Virtual environment
+venv/
+env/
+.env
