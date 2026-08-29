@@ -167,8 +167,8 @@ Safari JavaScript arama motoru (app.js)
 
 ## Sürüm Bilgisi
 
-- **Versiyon:** 4.2.0
-- **Karar Sayısı:** 50.000
+- **Versiyon:** 4.3.0
+- **Karar Sayısı:** 100.000
 - **İndeks Shard:** 64
 - **Doküman Chunk:** 500
 - **Kapsam:** Yargıtay Ceza Daireleri (2020)

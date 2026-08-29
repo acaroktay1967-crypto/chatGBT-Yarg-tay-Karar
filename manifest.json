@@ -1,1 +1,1 @@
-{"count":50000,"index_shards":64,"doc_chunk":100,"doc_chunks":500,"year_min":2020,"year_max":2020,"version":"4.1-final"}
+{"count": 100000, "index_shards": 64, "doc_chunk": 100, "doc_chunks": 1000, "year_min": 2020, "year_max": 2020, "version": "4.3-2024-2026"}
