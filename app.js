@@ -79,6 +79,36 @@ function snippet(text,ts){
   return (a?"…":"")+text.slice(a,b)+(b<text.length?"…":"");
 }
 
+async function copyText(text){
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  }catch{}
+
+  const textarea=document.createElement("textarea");
+  textarea.value=text;
+  textarea.setAttribute("readonly","");
+  textarea.style.position="fixed";
+  textarea.style.opacity="0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied=document.execCommand("copy");
+  textarea.remove();
+  if(!copied) throw new Error("Metin panoya kopyalanamadı.");
+}
+
+function decisionText(m,text){
+  const citation=[
+    m.court||"Yargıtay",
+    m.esas_no&&`E: ${m.esas_no}`,
+    m.karar_no&&`K: ${m.karar_no}`,
+    m.karar_tarihi&&`Tarih: ${m.karar_tarihi}`
+  ].filter(Boolean).join(" · ");
+  return `${citation}\n\n${text}`;
+}
+
 async function init(){
   const mr=await fetch("manifest.json");
   if(!mr.ok) throw new Error("manifest.json açılamadı: "+mr.status);
@@ -198,7 +228,52 @@ async function go(){
         bt.remove();
       };
 
-      c.append(title,mm,t,bt);
+      const actions=document.createElement("div");
+      actions.className="decision-actions";
+
+      const copyBtn=document.createElement("button");
+      copyBtn.className="more";
+      copyBtn.textContent="Tümünü Kopyala";
+
+      const shareBtn=document.createElement("button");
+      shareBtn.className="more";
+      shareBtn.textContent="Paylaş";
+
+      const actionStatus=document.createElement("p");
+      actionStatus.className="decision-status";
+      actionStatus.setAttribute("role","status");
+      actionStatus.setAttribute("aria-live","polite");
+
+      copyBtn.onclick=async()=>{
+        try{
+          await copyText(decisionText(x.m,x.text));
+          actionStatus.textContent="Kararın tamamı kopyalandı.";
+        }catch(e){
+          actionStatus.textContent=e.message;
+        }
+      };
+
+      shareBtn.onclick=async()=>{
+        const text=decisionText(x.m,x.text);
+        if(!navigator.share){
+          try{
+            await copyText(text);
+            actionStatus.textContent="Paylaşım desteklenmiyor; kararın tamamı kopyalandı.";
+          }catch(e){
+            actionStatus.textContent=e.message;
+          }
+          return;
+        }
+        try{
+          await navigator.share({title:x.m.court||"Yargıtay kararı",text});
+          actionStatus.textContent="Karar paylaşıldı.";
+        }catch(e){
+          if(e.name!=="AbortError") actionStatus.textContent="Karar paylaşılamadı.";
+        }
+      };
+
+      actions.append(copyBtn,shareBtn);
+      c.append(title,mm,t,bt,actions,actionStatus);
       res.append(c);
     }
   }catch(e){
