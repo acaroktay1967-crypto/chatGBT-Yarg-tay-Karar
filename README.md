@@ -12,6 +12,7 @@ iPhone ve masaüstü için Yargıtay karar arama motoru.
 - İlgililik sıralaması
 - En yeni karar sıralaması
 - Tam Kararı Aç
+- Kararın tamamını kopyalama ve paylaşma
 - a-Shell mini desteği
 - GitHub gerektirmeden iPhone üzerinde yerel çalışma
 
@@ -121,6 +122,7 @@ Safari JavaScript arama motoru (app.js)
 
 1. Arama sonuçlarında "Tam Kararı Aç" butonuna tıklayın
 2. Karar metninin tamamı gösterilir
+3. "Tümünü Kopyala" ile karar metnini panoya alın veya "Paylaş" ile cihazın paylaşım menüsünü açın
 
 ## Teknik Detaylar
 

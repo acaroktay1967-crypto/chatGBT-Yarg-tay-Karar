@@ -90,6 +90,26 @@ function escapeAttr(s) {
   return escapeHtml(s).replaceAll("'", "&#39;");
 }
 
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch { /* use the fallback below */ }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Metin panoya kopyalanamadı.");
+}
+
 function citation(row) {
   const bits = ["Yargıtay"];
   if (row.court) bits.push(row.court);
@@ -372,7 +392,9 @@ function kararView(d, q) {
             ${saved ? "✓ Kayıtlı" : "📁 Kaydet"}
           </button>
           <button class="ghost" id="copy-btn">📋 Kopyala</button>
+          <button class="ghost" id="share-btn">↗ Paylaş</button>
         </div>
+        <p class="status-line" id="decision-action-status" role="status" aria-live="polite"></p>
       </div>
       <div class="decision-body">${body}</div>
     </article>
@@ -454,13 +476,35 @@ function bindKararActions(d) {
     }
   });
   
-  document.getElementById("copy-btn")?.addEventListener("click", () => {
+  document.getElementById("copy-btn")?.addEventListener("click", async () => {
     const text = d.citation + "\n\n" + (d.text || "");
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = document.getElementById("copy-btn");
-      btn.textContent = "✓ Kopyalandı";
-      setTimeout(() => btn.textContent = "📋 Kopyala", 2000);
-    });
+    const status = document.getElementById("decision-action-status");
+    try {
+      await copyText(text);
+      status.textContent = "Kararın tamamı kopyalandı.";
+    } catch (err) {
+      status.textContent = err.message;
+    }
+  });
+
+  document.getElementById("share-btn")?.addEventListener("click", async () => {
+    const text = d.citation + "\n\n" + (d.text || "");
+    const status = document.getElementById("decision-action-status");
+    if (!navigator.share) {
+      try {
+        await copyText(text);
+        status.textContent = "Paylaşım desteklenmiyor; kararın tamamı kopyalandı.";
+      } catch (err) {
+        status.textContent = err.message;
+      }
+      return;
+    }
+    try {
+      await navigator.share({ title: d.citation, text });
+      status.textContent = "Karar paylaşıldı.";
+    } catch (err) {
+      if (err.name !== "AbortError") status.textContent = "Karar paylaşılamadı.";
+    }
   });
 }
 
