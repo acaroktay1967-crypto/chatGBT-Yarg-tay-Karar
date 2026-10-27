@@ -15,6 +15,29 @@ function toks(s){
   return [...new Set(a.filter(x=>x.length>=3))];
 }
 
+function caseQuery(s){
+  const raw=String(s||"");
+  const match=raw.match(/(^|[^\d])(\d{4})\s*\/\s*(\d+)(?!\d)/);
+  if(!match) return null;
+  const before=raw.slice(0,match.index)+match[1];
+  const after=raw.slice(match.index+match[0].length);
+  const context=low(`${before} ${after}`);
+  const field=/(?:^|\s)esas(?:\s|$)|(?:^|\s)e(?:\.(?=\s|$)|\b)/i.test(context)
+    ?"esas"
+    :/(?:^|\s)karar(?:\s|$)|(?:^|\s)k(?:\.(?=\s|$)|\b)/i.test(context)
+      ?"karar"
+      :"";
+  return {
+    number:`${Number(match[2])}/${Number(match[3])}`,
+    field
+  };
+}
+
+function normalizeCaseNo(value){
+  const match=String(value||"").match(/(\d{4})\s*\/\s*(\d+)/);
+  return match?`${Number(match[1])}/${Number(match[2])}`:"";
+}
+
 function shard(tok){
   let h=5381;
   for(const ch of tok){
@@ -138,8 +161,18 @@ async function go(){
 
   try{
     let ids=null;
+    const parsedCase=caseQuery(raw);
 
-    if(ts.length){
+    if(parsedCase){
+      ids=META
+        .filter(m=>{
+          const matchesEsas=normalizeCaseNo(m.esas_no)===parsedCase.number;
+          const matchesKarar=normalizeCaseNo(m.karar_no)===parsedCase.number;
+          return parsedCase.field==="esas"?matchesEsas:
+            parsedCase.field==="karar"?matchesKarar:matchesEsas||matchesKarar;
+        })
+        .map(m=>m.row_id);
+    }else if(ts.length){
       const lists=[];
       for(const t of ts){
         const p=await postings(t);
@@ -202,7 +235,9 @@ async function go(){
     }
 
     const shown=scored.slice(0,60);
-    st.textContent=cand.length+" sonuç bulundu; ilk "+shown.length+" gösteriliyor.";
+    st.textContent=parsedCase&&!cand.length
+      ?`${parsedCase.number} ${parsedCase.field||"esas/karar"} numarasıyla eşleşen karar bulunamadı.`
+      :cand.length+" sonuç bulundu; ilk "+shown.length+" gösteriliyor.";
     res.innerHTML="";
 
     for(const x of shown){
